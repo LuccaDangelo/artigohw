@@ -8,11 +8,7 @@
 \usepackage{xcolor}
 \usepackage{amsmath}
 
-% ---------------------------------------------------------------
-% \pend{...}: trecho que depende dos SEUS dados -> preencher.
-% \val{nome}: número gerado por bench/analyze.py (resultados.tex).
-% Antes de entregar, busque por "PREENCHER" e não deixe nenhum.
-% ---------------------------------------------------------------
+% \val{nome}: número gerado por bench/analyze.py (arquivo resultados.tex).
 \newcommand{\pend}[1]{\ifmmode\text{\textcolor{red}{[PREENCHER: #1]}}\else\textcolor{red}{[PREENCHER: #1]}\fi}
 \newcommand{\val}[1]{\ifcsname #1\endcsname\csname #1\endcsname\else\pend{#1}\fi}
 \IfFileExists{resultados.tex}{\input{resultados.tex}}{}
@@ -20,7 +16,7 @@
 \sloppy
 
 \title{Quanto custa a camada de virtualização?\\
-Perfil de desempenho de um MacBook Air com Apple Silicon\\
+Perfil de desempenho de um MacBook Air M5\\
 em macOS nativo e em uma VM Linux}
 
 \author{Lucca Albuquerque Dangelo\inst{1}}
@@ -33,30 +29,25 @@ em macOS nativo e em uma VM Linux}
 \maketitle
 
 \begin{abstract}
-  Linux virtual machines have become the default way to run development tools on
-  Apple Silicon laptops, yet the cost of this layer is rarely measured per
-  subsystem. This paper characterizes a MacBook Air along six axes (identification,
-  CPU/branch prediction, cache hierarchy, virtual memory, storage and parallelism)
-  in two environments on the same hardware: native macOS and a Linux VM managed by
-  OrbStack. Using portable microbenchmarks, three runs per measurement and median
-  reporting, we locate the machine's bottleneck with the roofline model and
-  Amdahl's law and quantify where virtualization adds overhead.
-  \pend{1 frase com o principal resultado, ex.: ``Compute-bound code showed
-  less than X\% overhead, while ...''}
+  We measure the cost of virtualization on a MacBook Air M5 along six axes in two environments on the
+  same hardware: native macOS and a Linux VM managed by OrbStack. Compute and
+  branch prediction showed negligible overhead (below 2\%), while cache and
+  memory latency beyond L1 rose by up to 43\% and page faults cost 2.2$\times$ more
+  per KiB. Storage could not be compared: the VM's virtual disk is cached
+  in host RAM, so guest benchmarks with \texttt{O\_DIRECT} measure memory, not
+  the SSD. The machine's bottleneck is memory bandwidth: a single core already
+  reaches 75\% of the nominal 153~GB/s.
 \end{abstract}
 
 \begin{resumo}
-  Máquinas virtuais Linux tornaram-se o caminho padrão para usar ferramentas de
-  desenvolvimento em notebooks com Apple Silicon, mas o custo dessa camada
-  raramente é medido por subsistema. Este artigo caracteriza um MacBook Air em
-  seis eixos (identificação, CPU/predição de desvios, hierarquia de cache,
-  memória virtual, armazenamento e paralelismo) em dois ambientes sobre o mesmo
-  hardware: macOS nativo e uma VM Linux gerenciada pelo OrbStack. Com
-  microbenchmarks portáveis, três execuções por medida e relato da mediana,
-  localizamos o gargalo da máquina pelo modelo \textit{roofline} e pela Lei de
-  Amdahl e quantificamos onde a virtualização acrescenta custo.
-  \pend{1 frase com o principal resultado, ex.: ``Código limitado por
-  computação teve custo inferior a X\%, enquanto ...''}
+  Medimos o custo da virtualização em um MacBook Air M5,
+  em seis eixos, em dois ambientes sobre o mesmo hardware: macOS nativo e uma VM Linux
+  gerenciada pelo OrbStack. Computação e predição de desvios tiveram custo
+  desprezível (abaixo de 2\%), enquanto a latência de cache e memória além do L1
+  subiu até 43\% e o \emph{page fault} ficou 2,2$\times$ mais caro por KiB. O armazenamento não pôde ser comparado: o disco virtual é mantido em
+  cache na RAM do host, e testes com \texttt{O\_DIRECT} na VM medem memória, não
+  o SSD. O gargalo da máquina é a banda de memória: um único núcleo já atinge
+  75\% dos 153~GB/s nominais.
 \end{resumo}
 
 % =================================================================
@@ -89,8 +80,8 @@ hipóteses:
     a 5\% na VM, pois roda nativamente com virtualização assistida por hardware.
   \item \textbf{H2 (cache e memória):} os degraus da escada de cache ocorrerão
     nos mesmos tamanhos nos dois ambientes (o hardware é o mesmo), mas a VM terá
-    latência maior para conjuntos de trabalho grandes e page faults mais caros,
-    devido à tradução de endereços em dois estágios.
+    latência maior para conjuntos de trabalho grandes e \emph{page faults} mais
+    caros, devido à tradução de endereços em dois estágios.
   \item \textbf{H3 (disco):} o armazenamento será o eixo de maior custo,
     sobretudo em leituras aleatórias de 4~KiB com fila rasa (QD=1), onde a
     latência de software adicional não é amortizada.
@@ -101,9 +92,10 @@ hipóteses:
 \end{itemize}
 
 As contribuições são: (i) um perfil de desempenho em seis eixos de um MacBook
-Air em dois ambientes; (ii) a quantificação do custo da virtualização por
-subsistema; e (iii) uma suíte de benchmark aberta e reprodutível, com scripts e
-dados brutos\footnote{\pend{link do repositório no GitHub}}.
+Air M5 em dois ambientes; (ii) a quantificação do custo da virtualização por
+subsistema; (iii) a constatação de que benchmarks de disco dentro da VM não
+medem o dispositivo; e (iv) uma suíte de benchmark aberta e reprodutível, com
+scripts e dados brutos\footnote{\url{https://github.com/LuccaDangelo/artigohw}}.
 
 % =================================================================
 \section{Fundamentação e trabalhos relacionados}
@@ -149,26 +141,27 @@ fração paralelizável.
 \subsection{Ambiente}
 
 A Tabela~\ref{tab:amb} descreve os dois ambientes. Ambos rodam sobre o mesmo
-hardware, com o notebook ligado à tomada, demais aplicativos fechados e
-intervalo entre execuções. Os programas foram compilados com o mesmo compilador
-(\texttt{clang}) e as mesmas opções (\texttt{-O2 -pthread}) nos dois ambientes,
-para que a diferença medida seja do ambiente e não do compilador.
+hardware, com o notebook ligado à tomada e demais aplicativos fechados. Os
+programas foram compilados com \texttt{clang} 21 e as mesmas opções
+(\texttt{-O2 -pthread}) nos dois ambientes, para que a diferença medida seja do
+ambiente e não do compilador.
 
 \begin{table}[ht]
 \centering
-\caption{Ambientes de teste (dados de \texttt{sysctl} e \texttt{lscpu}).}
+\caption{Ambientes de teste (dados de \texttt{sysctl}, \texttt{lscpu} e~\cite{apple2026}).}
 \label{tab:amb}
 \footnotesize
 \begin{tabular}{lll}
 \hline
  & \textbf{Host} & \textbf{VM} \\ \hline
-Sistema & macOS \pend{versão} & \pend{distro e kernel} \\
-Processador & Apple \pend{M?}, \pend{P+E} núcleos & \pend{n.º de vCPUs} \\
-Memória & \pend{GB} unificada & \pend{GB alocados} \\
-Cache (núcleo P) & L1d \pend{KiB}, L2 \pend{MiB} & (mesmo hardware) \\
-Página & \pend{16 KiB} & \pend{4 KiB} \\
-Virtualização & -- & OrbStack \pend{versão} (Hypervisor.framework) \\
-Compilador & \pend{clang versão} & \pend{clang versão} \\
+Sistema & macOS 26.5.1 & Ubuntu 26.04.1, kernel 7.0.14 \\
+Processador & Apple M5: 4 núcleos P + 6 E & 10 vCPUs (9 utilizáveis) \\
+Memória & 16~GB unificada, 153~GB/s nominais & 8~GB visíveis \\
+Cache (núcleo P) & L1d 128~KiB, L2 16~MiB & (mesmo hardware) \\
+Cache (núcleo E) & L1d 64~KiB, L2 6~MiB & (mesmo hardware) \\
+Página & 16~KiB & 4~KiB \\
+Virtualização & -- & OrbStack 2.2.3 (Hypervisor.framework) \\
+Compilador & Apple clang 21.0.0 & clang 21.1.8 \\
 \hline
 \end{tabular}
 \end{table}
@@ -199,50 +192,61 @@ conjunto de aulas e a uma teoria explicativa:
   \item \textbf{Disco (A11):} \texttt{fio} com \texttt{--direct=1} para
     contornar o cache de páginas: leitura e escrita sequenciais de 1~MiB e
     leitura aleatória de 4~KiB com QD=1 e QD=32, 15~s cada, arquivo de 512~MiB
-    no disco nativo de cada ambiente.
-  \item \textbf{Paralelismo (A12--A13):} escalonamento forte de 1 a $N$
-    threads para dois núcleos: um limitado por computação (32 cadeias
-    independentes de FMA em vetores NEON de 2 \texttt{double}) e um limitado por memória (\emph{triad}). A fração
-    paralela $p$ é obtida ajustando a Lei de Amdahl por mínimos quadrados.
+    no disco de cada ambiente.
+  \item \textbf{Paralelismo (A12--A13):} escalonamento forte de 1 a 10
+    threads para dois núcleos de cálculo: um limitado por computação (32 cadeias
+    independentes de FMA em vetores NEON de 2 \texttt{double}) e um limitado por
+    memória (\emph{triad}). A fração paralela $p$ é obtida ajustando a Lei de
+    Amdahl por mínimos quadrados.
 \end{enumerate}
 
-Para o \emph{roofline}, o teto de computação $\pi$ é o pico do núcleo de FMA em
-uma thread e o teto de memória $\beta$ é a banda do \emph{triad}. Como
+Para o \emph{roofline}, o teto de computação $\pi$ é o desempenho do núcleo de
+FMA em uma thread e o teto de memória $\beta$ é a banda do \emph{triad}. Como
 exemplos de ``código real'', posicionamos duas multiplicações de matrizes
 $1024 \times 1024$ em \texttt{double}: a ordem ingênua \emph{ijk}, que percorre
 $B$ por colunas, e a ordem \emph{ikj}, que percorre todas as matrizes por linhas.
+Para a \emph{ijk}, supomos o pior caso: cada acesso a $B$ traz uma linha nova de
+128~bytes da memória, mais 8~bytes de $A$, ou seja, $I = 2/136$~FLOP/byte. Para
+a \emph{ikj}, usamos a intensidade do fluxo de dados sem reúso, $I = 2/24$.
 
 \subsection{Protocolo}
 
 Cada medida foi executada três vezes em cada ambiente, e reportamos a
-\textbf{mediana}. As hipóteses da Seção~1 foram registradas antes da primeira
+\textbf{mediana}\footnote{Uma das três execuções de leitura sequencial no host
+foi interrompida manualmente e descartada; nesse item, a mediana é de duas
+execuções.}. As hipóteses da Seção~1 foram registradas antes da primeira
 execução. O custo da VM é dado por $t_{VM}/t_{host} - 1$ para métricas de
 tempo e por $x_{host}/x_{VM} - 1$ para métricas de vazão; valores positivos
 indicam que a VM foi pior. Todo o processo é automatizado por
 \texttt{run.sh} (coleta) e \texttt{analyze.py} (medianas, ajuste de Amdahl,
-figuras e tabelas).
+figuras e tabelas). A dispersão entre execuções foi baixa: o pico de FMA
+variou menos de 0,6\% e a banda do \emph{triad}, menos de 5\%.
 
 \subsection{Ameaças à validade}
 
-(i) O macOS gerencia frequência e alocação entre núcleos P e E sem controle do
-usuário; a VM herda essas decisões, e o MacBook Air não tem ventoinha, então
-execuções longas podem sofrer \emph{throttling} térmico. (ii) Os tamanhos de
-página diferem (16~KiB no macOS e \pend{4~KiB} na VM), o que afeta TLB e
-\emph{page faults}. (iii) Sem contadores de hardware, IPC e taxa de
-\emph{branch-miss} não são medidos diretamente. (iv) O \texttt{fio} no macOS
-usa \texttt{F\_NOCACHE} para emular \texttt{O\_DIRECT}, e o disco da VM é um
-arquivo-imagem sobre o APFS, então os dois caminhos de E/S não são idênticos ---
-o que é justamente parte do custo que se quer medir.
+(i) O macOS decide frequência e alocação entre núcleos P e E sem controle do
+usuário, e o MacBook Air não tem ventoinha, então execuções longas podem sofrer
+redução térmica de frequência. (ii) Os tamanhos de página diferem (16~KiB no
+macOS e 4~KiB na VM); isso se confunde com o efeito da tradução em dois
+estágios e não pode ser separado neste desenho experimental. (iii) Sem
+contadores de hardware, IPC e taxas de falta (desvio, TLB) não são medidos
+diretamente, apenas inferidos pelo tempo. (iv) O teto de computação é o do
+nosso núcleo de FMA, não o pico teórico do processador. (v) O \texttt{fio} no
+macOS usa \texttt{F\_NOCACHE} para emular \texttt{O\_DIRECT}; na VM, o disco é
+um arquivo-imagem sobre o APFS do host, o que se revelou decisivo
+(Seção~\ref{sec:disco}).
 
 % =================================================================
-\section{Resultados parciais}
+\section{Resultados}
 
 A Tabela~\ref{tab:res} resume as medianas; as subseções interpretam cada eixo
 com a teoria correspondente.
 
 \begin{table}[ht]
 \centering
-\caption{Medianas de 3 execuções. ``Custo VM'' positivo indica pior na VM.}
+\caption{Medianas de 3 execuções. ``Custo VM'' positivo indica pior na VM.
+$^\dagger$Não comparável: o disco da VM é servido pelo cache do host
+(Seção~\ref{sec:disco}).}
 \label{tab:res}
 \small
 \IfFileExists{tabela.tex}{\input{tabela.tex}}{\pend{rodar analyze.py para gerar a tabela}}
@@ -254,10 +258,17 @@ No host, o laço com dados aleatórios levou \val{unsortedHost}~ns por elemento,
 contra \val{sortedHost}~ns com o vetor ordenado --- uma razão de
 \val{branchRatioHost}$\times$. Na VM, a razão foi \val{branchRatioVm}$\times$.
 Pela equação de desempenho $T = N \times CPI \times T_{ciclo}$, o número de
-instruções é o mesmo nos dois casos; a diferença vem do CPI, inflado pelo
-esvaziamento do \emph{pipeline} a cada predição errada.
-\pend{interpretar: a razão é parecida nos dois ambientes? Se sim, isso
-confirma H1: o preditor de desvios é hardware e a VM não interfere.}
+instruções é o mesmo nos dois casos; a diferença vem do CPI. Com dados
+aleatórios, o desvio é imprevisível em cerca de metade dos elementos, e cada
+predição errada esvazia o \emph{pipeline}: a diferença de 2,1~ns por elemento
+corresponde a cerca de 4~ns por predição errada. Com o vetor ordenado, o
+desvio vira um padrão longo e previsível, e o custo some.
+
+A razão é praticamente a mesma nos dois ambientes, assim como o pico de FMA
+(\val{peakHost} \emph{vs.} \val{peakVm}~GFLOP/s, diferença de 0,1\%). Isso
+\textbf{confirma H1}: o preditor de desvios e as unidades de ponto flutuante
+são hardware, e o código do hóspede executa diretamente sobre eles, como prevê
+o critério de Popek e Goldberg~\cite{popek1974}.
 
 \subsection{Hierarquia de cache}
 
@@ -268,30 +279,65 @@ confirma H1: o preditor de desvios é hardware e a VM não interfere.}
 \label{fig:cache}
 \end{figure}
 
-A Figura~\ref{fig:cache} mostra a escada de latência. No host, o acesso
-dentro do L1 custou \val{loneHost}~ns e, para 256~MiB (DRAM), \val{dramHost}~ns;
-na VM, \val{dramVm}~ns.
-\pend{interpretar: (1) os degraus coincidem com o L1d e o L2 da Tabela 1?
-(2) a curva da VM se descola da do host só depois de qual tamanho? Isso é
-coerente com o custo extra do page walk em dois estágios (H2).}
+A Figura~\ref{fig:cache} mostra a escada de latência. Os degraus batem com a
+Tabela~\ref{tab:amb}: a latência fica em \val{loneHost}~ns até 128~KiB (o L1d
+do núcleo P) e salta para cerca de 2,5~ns em 192~KiB; o segundo degrau ocorre
+entre 12 e 16~MiB, o tamanho do L2. Entre 16 e 48~MiB a curva sobe de forma
+gradual, compatível com um nível de cache compartilhado do sistema antes da
+DRAM, cujo tamanho a Apple não divulga. Acima disso, a latência se estabiliza
+na DRAM: \val{dramHost}~ns no host.
+
+Os degraus ocorrem nos mesmos tamanhos na VM, como previsto em H2, mas o custo
+não é uniforme. Dentro do L1, as latências são idênticas (\val{loneVm}~ns).
+Entre 192~KiB e 12~MiB, a VM fica de 13 a 43\% mais lenta; em 16~MiB, as duas
+curvas se encontram; na DRAM, a VM volta a ser 10\% mais lenta
+(\val{dramVm}~ns). Esse padrão é coerente com faltas na TLB, e não com o cache
+em si: o L1 de 128~KiB cabe em poucas páginas nos dois ambientes, mas a partir
+daí a VM, com páginas de 4~KiB, precisa de quatro vezes mais traduções que o
+host para o mesmo conjunto de trabalho, e cada falta na TLB do hóspede exige um
+\emph{page walk} em dois estágios~\cite{bhargava2008}. Em 16~MiB, as faltas no
+L2 dominam o tempo nos dois ambientes e mascaram a diferença. \textbf{H2 é
+confirmada}, com a ressalva de que o efeito do tamanho de página não pode ser
+separado do efeito da tradução aninhada.
 
 \subsection{Memória e memória virtual}
 
 O primeiro toque em memória recém-alocada custou \val{faultHost}~ns/KiB no host
-e \val{faultVm}~ns/KiB na VM. A banda sustentada (\emph{triad}) foi
-\val{triadHost}~GB/s no host e \val{triadVm}~GB/s na VM.
-\pend{interpretar: page fault na VM exige saída para o hipervisor na primeira
-vez que a página física é usada, então o custo deve ser maior; já a banda
-sequencial deve ser parecida, pois depois de mapeada a memória é acessada
-diretamente.}
+e \val{faultVm}~ns/KiB na VM, ou seja, 2,2$\times$ mais por byte. Por página, o
+host gasta cerca de 680~ns para mapear e zerar 16~KiB, e a VM cerca de 370~ns
+para 4~KiB. A VM paga dois custos: quatro vezes mais \emph{page faults} para a
+mesma memória e, provavelmente, a participação do hipervisor no primeiro uso de cada
+página física, para preencher a tabela de segundo estágio.
 
-\subsection{Disco}
+Depois de mapeada, porém, a memória é acessada diretamente: a banda do
+\emph{triad} foi \val{triadHost}~GB/s no host e \val{triadVm}~GB/s na VM
+(2,5\% de diferença). Uma única thread atinge 75\% dos 153~GB/s nominais do
+M5~\cite{apple2026}, o que antecipa o resultado de paralelismo.
 
-Na leitura aleatória de 4~KiB, o host atingiu \val{qdoneHost}~IOPS com QD=1 e
-\val{qdttHost}~IOPS com QD=32; a VM, \val{qdoneVm} e \val{qdttVm}~IOPS.
-\pend{interpretar: com QD=1 cada operação espera a anterior, então a latência
-de software da VM pesa inteira; com QD=32 ela é amortizada pelo paralelismo do
-SSD. Confirmar ou refutar H3.}
+\subsection{Disco: o que a VM realmente mede}
+\label{sec:disco}
+
+No host, o SSD entregou \val{qdoneHost}~IOPS em leitura aleatória de 4~KiB com
+QD=1 (latência mediana de 69~$\mu$s) e \val{qdttHost}~IOPS com QD=32. O ganho
+de quase 10$\times$ com a fila mais profunda é o esperado: com uma requisição
+por vez, cada leitura espera a anterior; com 32, o controlador explora o
+paralelismo interno do SSD. A leitura sequencial ficou em cerca de 6,1~GB/s.
+
+Na VM, os números são fisicamente impossíveis para o mesmo SSD:
+\val{qdoneVm}~IOPS com QD=1, latência mediana de 0,2~$\mu$s e leitura
+sequencial de 24~GB/s, quatro vezes acima do host. Além disso, aumentar a fila
+de 1 para 32 não muda nada (\val{qdttVm}~IOPS), o que indica que não existe
+dispositivo com paralelismo interno do outro lado. A explicação é que o disco
+virtual é um arquivo no APFS do host: \texttt{--direct=1} contorna apenas o
+cache de páginas do hóspede, e o arquivo de 512~MiB passa a ser servido pelo
+cache do macOS, na RAM. Ou seja, \textbf{a VM mediu memória, não o SSD}.
+
+Por isso, H3 não pôde ser testada como formulada: não é possível afirmar que o
+disco da VM é mais rápido nem mais lento que o do host com este experimento. O
+achado tem consequência prática: benchmarks de E/S executados dentro de VMs de
+desenvolvimento podem superestimar o armazenamento em uma ordem de grandeza.
+Um teste correto exigiria um arquivo maior que a RAM do host ou escritas com
+\texttt{fsync}, o que fica como trabalho futuro.
 
 \subsection{Paralelismo e Lei de Amdahl}
 
@@ -302,51 +348,77 @@ SSD. Confirmar ou refutar H3.}
 \label{fig:scaling}
 \end{figure}
 
-No núcleo de computação, o ajuste de Amdahl resultou em
-$p = \val{pCpuHost}$ no host e $p = \val{pCpuVm}$ na VM, com \emph{speedup}
-máximo de \val{speedupMaxCpuHost}$\times$ e \val{speedupMaxCpuVm}$\times$. No
-núcleo de memória, o \emph{speedup} máximo foi \val{speedupMaxMemHost}$\times$
-(host) e \val{speedupMaxMemVm}$\times$ (VM).
-\pend{interpretar: (1) onde a curva de computação dobra? Deve ser no número de
-núcleos P --- os núcleos E são mais lentos, então um p ``baixo'' aqui não é
-código serial, é hardware heterogêneo; (2) a curva de memória satura cedo
-porque todos os núcleos disputam a mesma banda (memory wall).}
+No núcleo de computação (Figura~\ref{fig:scaling}, à esquerda), o
+\emph{speedup} é quase linear até 4 threads (3,83$\times$), o número de núcleos
+P. Daí em diante, cada thread adicional acrescenta cerca de 0,75 de núcleo P,
+até \val{speedupMaxCpuHost}$\times$ com 10 threads. O ajuste de Amdahl dá
+$p = \val{pCpuHost}$, mas esse número não deve ser lido como ``2\% de código
+serial'': o núcleo de FMA não tem parte serial. A perda vem de o trabalho ser
+dividido igualmente entre núcleos diferentes, e o tempo total é ditado pelos
+núcleos E, mais lentos. A Lei de Amdahl supõe núcleos idênticos, e um
+\emph{p} menor que 1 aqui é um sintoma de hardware heterogêneo.
+
+A VM acompanha o host até 9 threads (\val{speedupMaxCpuVm}$\times$) e cai com 10
+(6,0$\times$). A causa está na Tabela~\ref{tab:amb}: a VM expõe 10 vCPUs, mas só
+9 estão disponíveis para os processos (\texttt{nproc} = 9). Com 10 threads, duas
+disputam o mesmo processador, e a última fatia de trabalho atrasa o conjunto.
+
+No núcleo de memória (à direita), o \emph{speedup} máximo foi
+\val{speedupMaxMemHost}$\times$ (host) e \val{speedupMaxMemVm}$\times$ (VM):
+uma única thread já consome praticamente toda a banda disponível, e as demais
+só disputam o mesmo barramento. É o \emph{memory wall} em sua forma mais clara.
+\textbf{H4 é confirmada} nos dois ambientes, com a ressalva de que a saturação
+de memória ocorre já com uma thread, antes do previsto.
 
 \subsection{\emph{Roofline}: onde está o gargalo}
 
 \begin{figure}[ht]
 \centering
 \IfFileExists{figs/roofline.pdf}{\includegraphics[width=.85\textwidth]{figs/roofline.pdf}}{\pend{figs/roofline.pdf}}
-\caption{\emph{Roofline} de uma thread nos dois ambientes.}
+\caption{\emph{Roofline} de uma thread nos dois ambientes (as curvas se sobrepõem).}
 \label{fig:roof}
 \end{figure}
 
-O pico de computação em uma thread foi \val{peakHost}~GFLOP/s no host e
-\val{peakVm}~GFLOP/s na VM. Combinado com a banda do \emph{triad}, o ponto de
-inflexão fica em $I^\ast \approx \val{ridgeHost}$~FLOP/byte no host. A
-multiplicação \emph{ijk} atingiu \val{ijkHost}~GFLOP/s e a \emph{ikj},
-\val{ikjHost}~GFLOP/s --- o mesmo número de operações, com desempenho muito
-diferente.
-\pend{interpretar: a ijk está bem abaixo da rampa: o gargalo é buscar dados de
-B coluna a coluna, sem localidade. A ikj fica acima da rampa da DRAM porque
-reaproveita dados no cache, o que eleva sua intensidade aritmética efetiva.
-Concluir: o gargalo desta máquina, para código típico, é \_\_\_.}
+Com $\pi = \val{peakHost}$~GFLOP/s e $\beta = \val{triadHost}$~GB/s, o ponto de
+inflexão fica em $I^\ast \approx \val{ridgeHost}$~FLOP/byte
+(Figura~\ref{fig:roof}). As duas multiplicações de matrizes fazem exatamente as
+mesmas $2N^3$ operações, mas a \emph{ijk} atingiu \val{ijkHost}~GFLOP/s e a
+\emph{ikj}, \val{ikjHost}~GFLOP/s --- dez vezes mais. Para a \emph{ijk}, o
+modelo prevê $\beta \times 2/136 \approx 1{,}68$~GFLOP/s, a cerca de 5\% do
+valor medido: ela está sobre a rampa, limitada por buscar uma linha nova de $B$ a
+cada multiplicação. A \emph{ikj} fica acima da rampa da DRAM porque reaproveita
+no cache as linhas de $B$ e $C$, o que eleva sua intensidade aritmética efetiva
+além de $I^\ast$; com isso, ela chega a 83\% do teto de computação. A
+diferença entre as duas é localidade, não aritmética. Na VM, os dois pontos
+mudam menos de 4\%.
 
 % =================================================================
 \section{Conclusão}
 
-Este artigo caracterizou um MacBook Air com Apple Silicon em seis eixos, em
-macOS nativo e em uma VM Linux, para responder onde está o gargalo da máquina
-e quanto dele vem da camada de virtualização.
-\pend{2--3 frases com a resposta: ``O gargalo desta máquina é \_\_\_, porque
-\_\_\_. A virtualização custou menos de \_\_\% em CPU e cache, mas \_\_\% em
-\_\_\_.'' Dizer quais hipóteses foram confirmadas e quais foram refutadas.}
+Este artigo caracterizou um MacBook Air M5 em seis eixos, em macOS nativo e em
+uma VM Linux, para responder onde está o gargalo da máquina e quanto dele vem
+da camada de virtualização.
 
-Como trabalhos futuros, pretendemos: (i) incluir um hóspede Windows 11 ARM,
-para comparar sistemas operacionais sobre o mesmo hipervisor; (ii) medir IPC e
-faltas na TLB com contadores de hardware via Instruments; e (iii) comparar VM e
-contêiner sobre a mesma VM, repetindo a análise de Felter et al.~\cite{felter2015}
-em ARM.
+\textbf{O gargalo desta máquina é a banda de memória}, porque uma única thread
+já consome 75\% dos 153~GB/s nominais e código limitado por memória não escala
+com mais núcleos (1,1$\times$ com 10 threads), enquanto o ponto de inflexão do
+\emph{roofline}, em 0,19~FLOP/byte, deixa abaixo dele qualquer código com pouca
+localidade, como a multiplicação ingênua.
+
+Quanto à virtualização, o custo depende do subsistema: nulo em computação e
+predição de desvios (H1 confirmada); de até 43\% na latência de memória além
+do L1 e 2,2$\times$ no \emph{page fault} por KiB, coerente com páginas menores e
+tradução em dois estágios (H2 confirmada); e não mensurável no disco, porque o
+disco virtual é servido pela RAM do host (H3 não testável). Na prática, para
+quem programa, rodar o ambiente em uma VM no Mac custa pouco em código de
+computação, algo em código com acessos espalhados pela memória, e torna
+enganosa qualquer medição de E/S feita dentro dela.
+
+Como trabalhos futuros, pretendemos: (i) medir o disco da VM com arquivos
+maiores que a RAM do host e com \texttt{fsync}; (ii) usar páginas grandes no
+hóspede para separar o efeito do tamanho de página do efeito da tradução
+aninhada; (iii) incluir um hóspede Windows 11 ARM sobre o mesmo hipervisor; e
+(iv) medir IPC e faltas na TLB com contadores de hardware via Instruments.
 
 \bibliographystyle{sbc}
 \bibliography{refs}

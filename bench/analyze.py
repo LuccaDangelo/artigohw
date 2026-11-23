@@ -55,8 +55,11 @@ def amdahl_fit(ns, speedups):
 
 
 macros = {}
-def M(name, val, fmt="{:.2f}"):
-    macros[name] = fmt.format(val).replace(".", "{,}")
+def M(name, val, fmt=None):
+    if fmt is None and abs(val) >= 1000:
+        macros[name] = f"{val:,.0f}".replace(",", ".")
+    else:
+        macros[name] = (fmt or "{:.2f}").format(val).replace(".", "{,}")
 
 # ---------- Figura 1: escada de cache ----------
 plt.figure(figsize=(6.4, 3.4))
@@ -113,8 +116,10 @@ plt.savefig(os.path.join(FIG, "roofline.pdf"))
 
 # ---------- Tabela principal + macros ----------
 ROWS = [  # (rótulo, chave, unidade, maior_e_melhor)
-    ("Latência L1 (32 KiB)", ("cache", "32"), "ns", False),
+    ("Latência 32 KiB", ("cache", "32"), "ns", False),
+    ("Latência 256 KiB", ("cache", "256"), "ns", False),
     ("Latência 4 MiB", ("cache", "4096"), "ns", False),
+    ("Latência 16 MiB", ("cache", "16384"), "ns", False),
     ("Latência DRAM (256 MiB)", ("cache", "262144"), "ns", False),
     ("Laço com desvio, aleatório", ("branch", "unsorted"), "ns/elem", False),
     ("Laço com desvio, ordenado", ("branch", "sorted"), "ns/elem", False),
@@ -135,7 +140,9 @@ for label, key, unit, higher in ROWS:
     if h is None and v is None:
         continue
     cost = ""
-    if h and v:
+    if h and v and key[0].startswith("disk_"):
+        cost = "n/c$^\\dagger$"
+    elif h and v:
         c = (h / v - 1) if higher else (v / h - 1)
         cost = f"{c*100:+.1f}\\%".replace(".", "{,}")
     def f(x):

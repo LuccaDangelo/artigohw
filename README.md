@@ -2,9 +2,13 @@
 
 Perfil de desempenho em 6 eixos, macOS nativo × VM Linux (OrbStack).
 
+Artigo da disciplina Infraestrutura de Hardware (CESAR School, 2026.2).
+Máquina: MacBook Air M5 (4P + 6E, 16 GB), macOS 26.5.1 × Ubuntu 26.04 no OrbStack 2.2.3.
+
 ```
 paper/   artigo no template SBC (abrir no Overleaf)
 bench/   bench.c (microbenchmarks), run.sh (coleta), analyze.py (medianas, figuras, tabelas)
+bench/results/{host,vm}/   dados brutos usados no artigo
 ```
 
 ## 1. Host (macOS) — ~6 min
@@ -14,7 +18,7 @@ Feche os outros apps e deixe o Mac na tomada.
 ```bash
 xcode-select --install        # só se ainda não tiver o clang
 brew install fio
-cd artigo/bench
+cd artigohw/bench
 ./run.sh host
 ```
 
@@ -24,7 +28,7 @@ cd artigo/bench
 orb create ubuntu bench
 orb -m bench                  # entra na VM; /Users do Mac já aparece montado
 sudo apt update && sudo apt install -y clang fio python3-matplotlib
-cd /Users/$USER/caminho/para/artigo/bench
+cd /Users/$USER/caminho/para/artigohw/bench
 ./run.sh vm
 ```
 

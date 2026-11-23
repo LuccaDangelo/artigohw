@@ -1,8 +1,10 @@
 \begin{tabular}{lrrrr}
 \hline
 \textbf{Métrica} & \textbf{Unid.} & \textbf{macOS} & \textbf{VM Linux} & \textbf{Custo VM} \\ \hline
-Latência L1 (32 KiB) & ns & 0{,}70 & 0{,}70 & +0{,}0\% \\
+Latência 32 KiB & ns & 0{,}70 & 0{,}70 & +0{,}0\% \\
+Latência 256 KiB & ns & 2{,}75 & 3{,}21 & +16{,}7\% \\
 Latência 4 MiB & ns & 6{,}56 & 9{,}41 & +43{,}4\% \\
+Latência 16 MiB & ns & 16{,}79 & 16{,}65 & -0{,}8\% \\
 Latência DRAM (256 MiB) & ns & 84{,}22 & 92{,}83 & +10{,}2\% \\
 Laço com desvio, aleatório & ns/elem & 2{,}31 & 2{,}31 & +0{,}2\% \\
 Laço com desvio, ordenado & ns/elem & 0{,}23 & 0{,}23 & +1{,}5\% \\
@@ -11,9 +13,9 @@ Banda de memória (triad) & GB/s & 114 & 111 & +2{,}5\% \\
 Pico FMA, 1 thread & GFLOP/s & 21{,}79 & 21{,}76 & +0{,}1\% \\
 Matriz ijk & GFLOP/s & 1{,}77 & 1{,}76 & +0{,}5\% \\
 Matriz ikj & GFLOP/s & 18{,}01 & 17{,}44 & +3{,}2\% \\
-Disco seq. leitura 1M & MB/s & 6.097 & 24.360 & -75{,}0\% \\
-Disco seq. escrita 1M & MB/s & 5.873 & 13.650 & -57{,}0\% \\
-Disco aleat. 4K QD1 & IOPS & 14.132 & 420.243 & -96{,}6\% \\
-Disco aleat. 4K QD32 & IOPS & 137.185 & 421.770 & -67{,}5\% \\
+Disco seq. leitura 1M & MB/s & 6.097 & 24.360 & n/c$^\dagger$ \\
+Disco seq. escrita 1M & MB/s & 5.873 & 13.650 & n/c$^\dagger$ \\
+Disco aleat. 4K QD1 & IOPS & 14.132 & 420.243 & n/c$^\dagger$ \\
+Disco aleat. 4K QD32 & IOPS & 137.185 & 421.770 & n/c$^\dagger$ \\
 \hline
 \end{tabular}
