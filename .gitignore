@@ -1,0 +1,8 @@
+bench/bench
+__pycache__/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+.DS_Store
